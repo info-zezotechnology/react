@@ -57,8 +57,7 @@ let deadline = 0;
 
 let currentPriorityLevel_DEPRECATED = NormalPriority;
 
-// `isInputPending` is not available. Since we have no way of knowing if
-// there's pending input, always yield at the end of the frame.
+// Always yield at the end of the frame.
 export function unstable_shouldYield(): boolean {
   return getCurrentTime() >= deadline;
 }
@@ -234,14 +233,6 @@ export function unstable_wrapCallback<T>(callback: () => T): () => T {
 }
 
 export function unstable_forceFrameRate() {}
-
-export function unstable_pauseExecution() {}
-
-export function unstable_continueExecution() {}
-
-export function unstable_getFirstCallbackNode(): null {
-  return null;
-}
 
 // Currently no profiling build
 export const unstable_Profiling = null;

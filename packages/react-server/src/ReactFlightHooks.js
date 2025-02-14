@@ -9,7 +9,7 @@
 
 import type {Dispatcher} from 'react-reconciler/src/ReactInternalTypes';
 import type {Request} from './ReactFlightServer';
-import type {Thenable, Usable} from 'shared/ReactTypes';
+import type {Thenable, Usable, ReactComponentInfo} from 'shared/ReactTypes';
 import type {ThenableState} from './ReactFlightThenable';
 import {
   REACT_MEMO_CACHE_SENTINEL,
@@ -17,10 +17,15 @@ import {
 } from 'shared/ReactSymbols';
 import {createThenableState, trackUsedThenable} from './ReactFlightThenable';
 import {isClientReference} from './ReactFlightServerConfig';
+import {
+  enableUseEffectEventHook,
+  enableSwipeTransition,
+} from 'shared/ReactFeatureFlags';
 
 let currentRequest = null;
 let thenableIndexCounter = 0;
 let thenableState = null;
+let currentComponentDebugInfo = null;
 
 export function prepareToUseHooksForRequest(request: Request) {
   currentRequest = request;
@@ -32,9 +37,13 @@ export function resetHooksForRequest() {
 
 export function prepareToUseHooksForComponent(
   prevThenableState: ThenableState | null,
+  componentDebugInfo: null | ReactComponentInfo,
 ) {
   thenableIndexCounter = 0;
   thenableState = prevThenableState;
+  if (__DEV__) {
+    currentComponentDebugInfo = componentDebugInfo;
+  }
 }
 
 export function getThenableStateAfterSuspending(): ThenableState {
@@ -42,34 +51,43 @@ export function getThenableStateAfterSuspending(): ThenableState {
   // which is not really supported anymore, it will be empty. We use the empty set as a
   // marker to know if this was a replay of the same component or first attempt.
   const state = thenableState || createThenableState();
+  if (__DEV__) {
+    // This is a hack but we stash the debug info here so that we don't need a completely
+    // different data structure just for this in DEV. Not too happy about it.
+    (state: any)._componentDebugInfo = currentComponentDebugInfo;
+    currentComponentDebugInfo = null;
+  }
   thenableState = null;
   return state;
 }
 
 export const HooksDispatcher: Dispatcher = {
-  useMemo<T>(nextCreate: () => T): T {
-    return nextCreate();
-  },
+  readContext: (unsupportedContext: any),
+
+  use,
   useCallback<T>(callback: T): T {
     return callback;
   },
-  useDebugValue(): void {},
-  useDeferredValue: (unsupportedHook: any),
-  useTransition: (unsupportedHook: any),
-  readContext: (unsupportedContext: any),
   useContext: (unsupportedContext: any),
+  useEffect: (unsupportedHook: any),
+  useImperativeHandle: (unsupportedHook: any),
+  useLayoutEffect: (unsupportedHook: any),
+  useInsertionEffect: (unsupportedHook: any),
+  useMemo<T>(nextCreate: () => T): T {
+    return nextCreate();
+  },
   useReducer: (unsupportedHook: any),
   useRef: (unsupportedHook: any),
   useState: (unsupportedHook: any),
-  useInsertionEffect: (unsupportedHook: any),
-  useLayoutEffect: (unsupportedHook: any),
-  useImperativeHandle: (unsupportedHook: any),
-  useEffect: (unsupportedHook: any),
-  useId,
+  useDebugValue(): void {},
+  useDeferredValue: (unsupportedHook: any),
+  useTransition: (unsupportedHook: any),
   useSyncExternalStore: (unsupportedHook: any),
-  useCacheRefresh(): <T>(?() => T, ?T) => void {
-    return unsupportedRefresh;
-  },
+  useId,
+  useHostTransitionStatus: (unsupportedHook: any),
+  useFormState: (unsupportedHook: any),
+  useActionState: (unsupportedHook: any),
+  useOptimistic: (unsupportedHook: any),
   useMemoCache(size: number): Array<any> {
     const data = new Array<any>(size);
     for (let i = 0; i < size; i++) {
@@ -77,8 +95,16 @@ export const HooksDispatcher: Dispatcher = {
     }
     return data;
   },
-  use,
+  useCacheRefresh(): <T>(?() => T, ?T) => void {
+    return unsupportedRefresh;
+  },
 };
+if (enableUseEffectEventHook) {
+  HooksDispatcher.useEffectEvent = (unsupportedHook: any);
+}
+if (enableSwipeTransition) {
+  HooksDispatcher.useSwipeTransition = (unsupportedHook: any);
+}
 
 function unsupportedHook(): void {
   throw new Error('This Hook is not supported in Server Components.');

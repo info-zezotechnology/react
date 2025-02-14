@@ -11,16 +11,17 @@
 
 let React;
 let ReactDOMClient;
-let ReactTestUtils;
 let act;
+let assertConsoleErrorDev;
 
 describe('ReactIdentity', () => {
   beforeEach(() => {
     jest.resetModules();
     React = require('react');
     ReactDOMClient = require('react-dom/client');
-    ReactTestUtils = require('react-dom/test-utils');
     act = require('internal-test-utils').act;
+    assertConsoleErrorDev =
+      require('internal-test-utils').assertConsoleErrorDev;
   });
 
   it('should allow key property to express identity', async () => {
@@ -127,7 +128,7 @@ describe('ReactIdentity', () => {
     expect(window.YOUVEBEENH4X0RED).toBe(undefined);
   });
 
-  it('should let restructured components retain their uniqueness', () => {
+  it('should let restructured components retain their uniqueness', async () => {
     const instance0 = <span />;
     const instance1 = <span />;
     const instance2 = <span />;
@@ -155,12 +156,16 @@ describe('ReactIdentity', () => {
       }
     }
 
-    expect(function () {
-      ReactTestUtils.renderIntoDocument(<TestContainer />);
-    }).not.toThrow();
+    const container = document.createElement('div');
+    const root = ReactDOMClient.createRoot(container);
+    await expect(
+      act(() => {
+        root.render(<TestContainer />);
+      }),
+    ).resolves.not.toThrow();
   });
 
-  it('should let nested restructures retain their uniqueness', () => {
+  it('should let nested restructures retain their uniqueness', async () => {
     const instance0 = <span />;
     const instance1 = <span />;
     const instance2 = <span />;
@@ -190,12 +195,16 @@ describe('ReactIdentity', () => {
       }
     }
 
-    expect(function () {
-      ReactTestUtils.renderIntoDocument(<TestContainer />);
-    }).not.toThrow();
+    const container = document.createElement('div');
+    const root = ReactDOMClient.createRoot(container);
+    await expect(
+      act(() => {
+        root.render(<TestContainer />);
+      }),
+    ).resolves.not.toThrow();
   });
 
-  it('should let text nodes retain their uniqueness', () => {
+  it('should let text nodes retain their uniqueness', async () => {
     class TestComponent extends React.Component {
       render() {
         return (
@@ -218,9 +227,13 @@ describe('ReactIdentity', () => {
       }
     }
 
-    expect(function () {
-      ReactTestUtils.renderIntoDocument(<TestContainer />);
-    }).not.toThrow();
+    const container = document.createElement('div');
+    const root = ReactDOMClient.createRoot(container);
+    await expect(
+      act(() => {
+        root.render(<TestContainer />);
+      }),
+    ).resolves.not.toThrow();
   });
 
   it('should retain key during updates in composite components', async () => {
@@ -272,7 +285,7 @@ describe('ReactIdentity', () => {
     expect(beforeB).toBe(afterB);
   });
 
-  it('should not allow implicit and explicit keys to collide', () => {
+  it('should not allow implicit and explicit keys to collide', async () => {
     const component = (
       <div>
         <span />
@@ -280,9 +293,13 @@ describe('ReactIdentity', () => {
       </div>
     );
 
-    expect(function () {
-      ReactTestUtils.renderIntoDocument(component);
-    }).not.toThrow();
+    const container = document.createElement('div');
+    const root = ReactDOMClient.createRoot(container);
+    await expect(
+      act(() => {
+        root.render(component);
+      }),
+    ).resolves.not.toThrow();
   });
 
   it('should throw if key is a Temporal-like object', async () => {
@@ -299,17 +316,18 @@ describe('ReactIdentity', () => {
 
     const el = document.createElement('div');
     const root = ReactDOMClient.createRoot(el);
-    await expect(() =>
-      expect(() => {
-        root.render(
-          <div>
-            <span key={new TemporalLike()} />
-          </div>,
-        );
-      }).toThrowError(new TypeError('prod message')),
-    ).toErrorDev(
-      'The provided key is an unsupported type TemporalLike.' +
-        ' This value must be coerced to a string before using it here.',
+    await expect(() => {
+      root.render(
+        <div>
+          <span key={new TemporalLike()} />
+        </div>,
+      );
+    }).toThrowError(new TypeError('prod message'));
+    assertConsoleErrorDev(
+      [
+        'The provided key is an unsupported type TemporalLike.' +
+          ' This value must be coerced to a string before using it here.',
+      ],
       {withoutStack: true},
     );
   });
